@@ -14,6 +14,9 @@ scenarios.
 * I feel like Go masters would not like using httptest.Recorder in this way, just a gut feeling. But Google uses the http.RoundTripper for OAuth against the docs, sooo, I'm sure it's fine. I suppose if the httptest module assumes it's not used in production there could also be a performance impact over other methods?
 * I don't fully understand the context handling code in the original project. So I pass the original lambda context to the constructed http.Request via .WithContext().
 
+### Gotcha's
+* Make sure that your Lambda Target Group has enabled Multivalued Headers.
+
 ### Why?
 I want to be able to use a muxer from
 [gorilla](https://github.com/gorilla/mux),
