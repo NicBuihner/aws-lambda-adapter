@@ -59,6 +59,18 @@ type AdapterRequest struct {
 	stripBasePath                   string
 }
 
+// According to the docs, defer in a wrapped handler will fire after the request has
+// completed, which allows us to ensure that the request has finished before the .Result()
+// is called later. I missed my initial reading in the docs stating that .Result()
+// should only be called after the request has finished, assumed that .Result() forced
+// the request handling into being synchronous.
+func requestDoneHandler(h http.Handler, ch chan struct{}) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer close(ch)
+		h.ServeHTTP(w, r)
+	})
+}
+
 // Proxy takes the handler from your flavor of framework and processes it into
 // an AdapterResponse which can be cast to the required event.Response type
 func (ar *AdapterRequest) Proxy(ctx context.Context, handler http.Handler) (*AdapterResponse, error) {
@@ -68,12 +80,13 @@ func (ar *AdapterRequest) Proxy(ctx context.Context, handler http.Handler) (*Ada
 	}
 	httpRequest = httpRequest.WithContext(ctx)
 
+	ch := make(chan struct{})
+	wh := requestDoneHandler(handler, ch) // Wrap the handler with our done notifier
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(http.ResponseWriter(w), httpRequest)
+	wh.ServeHTTP(http.ResponseWriter(w), httpRequest)
+	<-ch      // Wait for the request to finish completely
+	w.Flush() // Not positive this is necessary, but it's got a Flush() so I'll use a Flush().
 	resp := w.Result()
-	if err != nil {
-		return nil, errors.Wrap(err, "Unable to get http.Response from httptest.Recorder")
-	}
 
 	aresp, err := NewAdapterResponse(resp)
 	if err != nil {
@@ -184,9 +197,9 @@ type AdapterResponse struct {
 }
 
 // NewAdapterResponse converts an http.Response into an AdapterResponse
-func NewAdapterResponse(resp *http.Response) (*AdapterResponse, error) {
-	defer resp.Body.Close()
-	rb, err := ioutil.ReadAll(resp.Body)
+func NewAdapterResponse(r *http.Response) (*AdapterResponse, error) {
+	defer r.Body.Close()
+	rb, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "Unable to read response body")
 	}
@@ -202,10 +215,10 @@ func NewAdapterResponse(resp *http.Response) (*AdapterResponse, error) {
 	}
 
 	return &AdapterResponse{
-		StatusCode:        resp.StatusCode,
+		StatusCode:        r.StatusCode,
 		StatusDescription: "", // Why?
 		Headers:           map[string]string{},
-		MultiValueHeaders: resp.Header,
+		MultiValueHeaders: r.Header,
 		Body:              output,
 		IsBase64Encoded:   isBase64,
 	}, nil
