@@ -15,7 +15,7 @@ scenarios.
 * I don't fully understand the context handling code in the original project. So I pass the original lambda context to the constructed http.Request via .WithContext().
 
 ### Gotcha's
-* Make sure that your Lambda Target Group has enabled Multivalued Headers.
+* Make sure that your Lambda Target Group has [enabled multivalued headers](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/lambda-functions.html#multi-value-headers).
 
 ### Why?
 I want to be able to use a muxer from

@@ -64,6 +64,8 @@ type AdapterRequest struct {
 // is called later. I missed my initial reading in the docs stating that .Result()
 // should only be called after the request has finished, assumed that .Result() forced
 // the request handling into being synchronous.
+// https://golang.org/pkg/net/http/httptest/#ResponseRecorder.Result
+// https://golang.org/pkg/net/http/#Handler
 func requestDoneHandler(h http.Handler, ch chan struct{}) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer close(ch)
